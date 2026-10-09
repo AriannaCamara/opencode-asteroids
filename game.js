@@ -106,6 +106,8 @@ class PowerUp {
 const RADII  = [0, 16, 30, 50];   // por tamaño 1, 2, 3
 const SPEEDS = [0, 85, 55, 32];   // velocidad base por tamaño
 const POINTS = [0, 100, 50, 20];  // puntos por tamaño
+const STAR_POINTS = 300;          // bonificación por destruirla
+const STAR_SPEED  = 260;          // ~3× un asteroide pequeño
 
 class Asteroid {
   constructor(x, y, size = 3) {
@@ -113,6 +115,8 @@ class Asteroid {
     this.y    = y;
     this.size = size;
     this.radius = RADII[size];
+    this.points = POINTS[size];
+    this.explosion = size * 5;
     this.dead = false;
 
     const angle = rand(0, Math.PI * 2);
@@ -159,6 +163,94 @@ class Asteroid {
       ctx.lineTo(this.verts[i][0], this.verts[i][1]);
     ctx.closePath();
     ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ── ShootingStar ─────────────────────────────────────────────────────────────
+class ShootingStar extends Asteroid {
+  constructor(x, y) {
+    super(x, y, 1);
+    this.ttl  = rand(4, 6);
+    this.points    = STAR_POINTS;
+    this.explosion = 14;
+
+    const angle = rand(0, Math.PI * 2);
+    const speed = STAR_SPEED + rand(-30, 30);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+  }
+
+  split() {
+    return [];
+  }
+
+  update(dt) {
+    super.update(dt);
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.dead = true;
+  }
+
+  draw() {
+    // Parpadeo al estar por expirar
+    if (this.ttl < 1 && Math.floor(this.ttl * 8) % 2 === 0) return;
+
+    // Dirección de vuelo y su perpendicular (para dar ancho a la cola)
+    const speed = Math.hypot(this.vx, this.vy) || 1;
+    const ux = this.vx / speed;
+    const uy = this.vy / speed;
+    const px = -uy;
+    const py = ux;
+
+    const TAIL   = 72;
+    const halfW  = this.radius * 0.7;
+    const tailX  = this.x - ux * TAIL;
+    const tailY  = this.y - uy * TAIL;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';   // brillos que se suman
+
+    // Cola exterior: triángulo ancho que se afila y desvanece
+    const outer = ctx.createLinearGradient(this.x, this.y, tailX, tailY);
+    outer.addColorStop(0,    'rgba(255, 240, 180, 0.8)');
+    outer.addColorStop(0.35, 'rgba(255, 200, 90, 0.4)');
+    outer.addColorStop(1,    'rgba(255, 150, 40, 0)');
+    ctx.fillStyle = outer;
+    ctx.beginPath();
+    ctx.moveTo(this.x + px * halfW, this.y + py * halfW);
+    ctx.lineTo(tailX, tailY);
+    ctx.lineTo(this.x - px * halfW, this.y - py * halfW);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cola interior: núcleo blanco, más corto y brillante
+    const inner = ctx.createLinearGradient(this.x, this.y, this.x - ux * TAIL * 0.5, this.y - uy * TAIL * 0.5);
+    inner.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    inner.addColorStop(1, 'rgba(255, 210, 110, 0)');
+    ctx.fillStyle = inner;
+    ctx.beginPath();
+    ctx.moveTo(this.x + px * halfW * 0.4, this.y + py * halfW * 0.4);
+    ctx.lineTo(this.x - ux * TAIL * 0.5, this.y - uy * TAIL * 0.5);
+    ctx.lineTo(this.x - px * halfW * 0.4, this.y - py * halfW * 0.4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Halo del núcleo
+    const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 1.7);
+    glow.addColorStop(0,   'rgba(255, 248, 210, 0.9)');
+    glow.addColorStop(0.4, 'rgba(255, 210, 110, 0.45)');
+    glow.addColorStop(1,   'rgba(255, 170, 40, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius * 1.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Núcleo: punto blanco luminoso
+    ctx.fillStyle = '#fffdf4';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }
 }
@@ -297,17 +389,29 @@ let ship, bullets, asteroids, particles, powerUps;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
+let starTimer;  // cuenta atrás para el próximo intento de estrella fugaz
+
+const SAFE_DIST = 130;
+
+function randomSafePosition() {
+  let x, y;
+  do {
+    x = rand(0, W);
+    y = rand(0, H);
+  } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
+  return { x, y };
+}
 
 function spawnAsteroids(count) {
-  const SAFE_DIST = 130;
   for (let i = 0; i < count; i++) {
-    let x, y;
-    do {
-      x = rand(0, W);
-      y = rand(0, H);
-    } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
+    const { x, y } = randomSafePosition();
     asteroids.push(new Asteroid(x, y, 3));
   }
+}
+
+function spawnShootingStar() {
+  const { x, y } = randomSafePosition();
+  asteroids.push(new ShootingStar(x, y));
 }
 
 function initGame() {
@@ -320,6 +424,7 @@ function initGame() {
   lives  = 3;
   level  = 1;
   state  = 'playing';
+  starTimer = rand(6, 12);
   spawnAsteroids(4);
 }
 
@@ -329,7 +434,9 @@ function nextLevel() {
   particles = [];
   powerUps  = [];
   ship.reset();
+  starTimer = rand(6, 12);
   spawnAsteroids(3 + level);
+  spawnShootingStar();   // garantizada al subir de nivel
 }
 
 function explode(x, y, count = 8) {
@@ -363,6 +470,7 @@ function update(dt) {
     particles.forEach(p => p.update(dt));
     particles = particles.filter(p => !p.dead);
     asteroids.forEach(a => a.update(dt));
+    asteroids = asteroids.filter(a => !a.dead);
     if (deadTimer <= 0) { state = 'playing'; ship.reset(); }
     return;
   }
@@ -378,6 +486,13 @@ function update(dt) {
   particles.forEach(p => p.update(dt));
   powerUps.forEach(p => p.update(dt));
 
+  // Estrella fugaz: aparición aleatoria cada cierto tiempo
+  starTimer -= dt;
+  if (starTimer <= 0) {
+    starTimer = rand(6, 14);
+    if (Math.random() < 0.35) spawnShootingStar();
+  }
+
   bullets   = bullets.filter(b => !b.dead);
   particles = particles.filter(p => !p.dead);
   powerUps  = powerUps.filter(p => !p.dead);
@@ -389,8 +504,8 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += POINTS[a.size];
-        explode(a.x, a.y, a.size * 5);
+        score += a.points;
+        explode(a.x, a.y, a.explosion);
         newAsteroids.push(...a.split());
         if (Math.random() < 0.15) powerUps.push(new PowerUp(a.x, a.y));
       }

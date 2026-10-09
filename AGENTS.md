@@ -7,6 +7,12 @@ Clon de Asteroids en HTML5 Canvas puro. Sin dependencias, bundler, build ni test
 - `game.js` — toda la lógica del juego (único archivo de código, ~600 líneas).
 - `index.html` — carga `game.js` como script clásico (no módulo); canvas fijo 800×600.
 - `favicon.svg`, `README.md`.
+- `.github/workflows/opencode.yml` — responde a `/oc` y `/opencode` en comentarios.
+- `.github/workflows/issue-format.yml` — al abrir un issue: formatea el body (conserva el texto
+  original verbatim entre `<!-- original:start -->` y `<!-- original:end -->`), aplica labels y
+  publica un comentario de triage con opencode (`agent: plan`, solo lectura).
+- `.github/scripts/format-issue.cjs` — lógica determinista del formateo y las labels. Idempotente:
+  si el body ya contiene `<!-- issue-format:start -->`, no toca el issue.
 
 No hay `package.json`, linter ni framework de test. No inventes comandos de build/test.
 

@@ -1,0 +1,64 @@
+name: Issue Format
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-format-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Formatear issue y aplicar labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const formatIssue = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/format-issue.cjs`)
+            await formatIssue({ github, context, core })
+
+  triage:
+    needs: format
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Comentario de triage
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode/big-pickle
+          agent: plan
+          prompt: |
+            Eres el asistente de triage del repositorio (clon de Asteroids en HTML5 Canvas puro; ver AGENTS.md).
+
+            Responde ÚNICAMENTE con un comentario de triage en español y en Markdown, con estas secciones:
+            - **Resumen**: 1-2 frases sobre qué reporta o pide el autor.
+            - **Área afectada**: clases o funciones de `game.js` involucradas (p. ej. `Ship`, `Asteroid`, colisiones con `dist`, power-ups, HUD). Cita `game.js:línea` cuando puedas.
+            - **Severidad estimada**: baja, media o alta, y por qué.
+            - **Pistas para el revisor**: posibles causas y dónde mirar.
+            - **Labels sugeridas**: elige de `bug`, `enhancement`, `documentation`, `question`, `game-logic`, `ui`, `audio`, `powerups`, `collision`, `rendering`.
+
+            Reglas estrictas:
+            - NO modifiques archivos, NO crees ramas y NO abras PRs.
+            - NO edites el issue ni sus labels; solo publica el comentario.
+            - No inventes pasos de reproducción: si falta información, pídesela al autor.

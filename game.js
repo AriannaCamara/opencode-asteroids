@@ -300,8 +300,20 @@ const SKINS = [
     points: [[18, 0], [-6, -13], [-13, -4], [-8, 0], [-13, 4], [-6, 13]] },
   { name: 'PHANTOM', color: '#c07dff', flame: 'rgba(60, 255, 130, 0.85)',
     points: [[21, 0], [-4, -7], [-14, -11], [-9, 0], [-14, 11], [-4, 7]] },
+  { name: 'NOVA', color: '#ff2d95', flame: 'rgba(0, 255, 200, 0.9)',
+    scale: 2, scoreMultiplier: 2,
+    gradient: ['#ff2d95', '#ffd24d', '#4df3ff'],
+    points: [[22, 0], [-6, -11], [-13, -7], [-9, 0], [-13, 7], [-6, 11]] },
 ];
 const SKIN_STORAGE_KEY = 'asteroids.skin';
+
+function shipScale() {
+  return SKINS[skinIndex].scale || 1;
+}
+
+function scoreMultiplier() {
+  return SKINS[skinIndex].scoreMultiplier || 1;
+}
 
 function loadSkin() {
   try {
@@ -323,6 +335,7 @@ function cycleSkin() {
   skinIndex = (skinIndex + 1) % SKINS.length;
   skinNameTimer = 1.5;
   saveSkin(skinIndex);
+  if (ship && !ship.dead) ship.radius = 12 * shipScale();
 }
 
 // ── Ship ──────────────────────────────────────────────────────────────────────
@@ -335,7 +348,7 @@ class Ship {
     this.angle  = -Math.PI / 2;
     this.vx     = 0;
     this.vy     = 0;
-    this.radius = 12;
+    this.radius = 12 * shipScale();
     this.thrusting     = false;
     this.invincible    = 3;
     this.shootCooldown = 0;
@@ -376,14 +389,15 @@ class Ship {
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const NOSE = 21;
+    const scale = shipScale();
+    const NOSE = 21 * scale;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
     if (this.tripleTimer <= 0) return [new Bullet(ox, oy, this.angle)];
 
     // Triple disparo: 3 balas paralelas en línea recta
-    const px = -Math.sin(this.angle) * 8;
-    const py =  Math.cos(this.angle) * 8;
+    const px = -Math.sin(this.angle) * 8 * scale;
+    const py =  Math.cos(this.angle) * 8 * scale;
     return [
       new Bullet(ox - px, oy - py, this.angle),
       new Bullet(ox,      oy,      this.angle),
@@ -398,9 +412,12 @@ class Ship {
 
     const skin = SKINS[skinIndex];
 
+    const scale = skin.scale || 1;
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
+    ctx.scale(scale, scale);
     ctx.strokeStyle = skin.color;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
@@ -430,7 +447,16 @@ class Ship {
         ctx.lineWidth   = 1.5;
       }
     }
-    ctx.strokeStyle = skin.color;
+
+    // Color de la silueta: degradado llamativo o color plano
+    if (skin.gradient) {
+      const grad = ctx.createLinearGradient(-22, 0, 22, 0);
+      skin.gradient.forEach((c, i) =>
+        grad.addColorStop(i / (skin.gradient.length - 1), c));
+      ctx.strokeStyle = grad;
+    } else {
+      ctx.strokeStyle = skin.color;
+    }
 
     // Silueta definida por la skin activa
     ctx.beginPath();
@@ -547,7 +573,7 @@ function explode(x, y, count = 8) {
 
 function destroyAsteroid(a) {
   a.dead = true;
-  score += a.points;
+  score += a.points * scoreMultiplier();
   explode(a.x, a.y, a.explosion);
   if (Math.random() < 0.15) powerUps.push(new PowerUp(a.x, a.y, randomPowerUpType()));
   return a.split();
@@ -710,9 +736,11 @@ function drawHUD() {
     drawLifeIcon(W - 16 - i * 22, 18);
 
   if (skinNameTimer > 0) {
+    const mult = scoreMultiplier();
+    const tag = mult > 1 ? `  (x${mult} PUNTOS)` : '';
     ctx.textAlign = 'center';
     ctx.fillStyle = SKINS[skinIndex].color;
-    ctx.fillText(`SKIN  ${SKINS[skinIndex].name}`, W / 2, H - 16);
+    ctx.fillText(`SKIN  ${SKINS[skinIndex].name}${tag}`, W / 2, H - 16);
     ctx.fillStyle = '#fff';
   }
 }

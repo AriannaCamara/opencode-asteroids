@@ -48,8 +48,10 @@ Luego visita `http://localhost:3000`.
 - Power-ups con duración limitada: velocidad (VEL, chevrons cyan), triple
   disparo (TRIPLE, tres puntos ámbar) y escudo (ESC, anillo verde). El escudo
   destruye los asteroides al impactar en vez de hacer perder una vida
-- Skins de nave (CLASSIC, VIPER, HORNET, PHANTOM) que se cambian con `K` y se
-  guardan en `localStorage`
+- Skins de nave (CLASSIC, VIPER, HORNET, PHANTOM, NOVA) que se cambian con `K`
+  y se guardan en `localStorage`. La skin NOVA es el doble de grande, con
+  colores llamativos, y multiplica x2 los puntos obtenidos a cambio de ser un
+  blanco más fácil
 - Estrella fugaz: muy rápida, con estela dorada, desaparece con el tiempo
   (parpadea al expirar) y da 300 puntos sin dividirse. Aparece de forma
   aleatoria durante el nivel y siempre al subir de nivel.
